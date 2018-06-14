@@ -3,7 +3,10 @@
 #include <LiquidCrystal_I2C.h>
 #include <Keypad.h>
 #include <Wire.h>
-
+#include <modbus.h>
+#include <modbusDevice.h>
+#include <modbusRegBank.h>
+#include <modbusSlave.h>
 
 #define DOUT  A2
 #define CLK  A1
@@ -18,14 +21,24 @@ const byte columnPins[columsCount]= {A11, A10, A9, A8};
 const int analogInTermocupla = 0;  // Analog input pin that the potentiometer is attached to
 const int analogInCelda = 2;//Entrada de la celda de carga 
 
+//PLC Settings
+
+#define RS485TxEnablePin 2
+#define RS485Baud 9600
+#define RS485Format SERIAL_8E1
+
+//Arduino Variables
+
+
 int sensorValue = 0;        // value read from the pot
 int outputValue = 0;        // value output to the PWM (analog out)
-int peso;
+int Peso,Temperatura,Presion;
 long startMillis = 0;
 long endMillis = 0;
 String mensajeAntiguoLinea1 = "";
 String mensajeAntiguoLinea2 = "";
 String mensajeSalida = "";
+char key;
 
 // definen los símbolos en los botones de los teclados 
 char keys[rowsCount][columsCount] = {
@@ -38,32 +51,67 @@ char keys[rowsCount][columsCount] = {
 Keypad keypad = Keypad(makeKeymap(keys), rowPins, columnPins, rowsCount, columsCount);
 HX711 balanza(DOUT, CLK);
 LiquidCrystal_I2C lcd(0x27, 16, 2);
-
+modbusDevice regBank;
+modbusSlave slave;
 
 void setup() 
 {
     lcd.begin();
+    initPLC();
     Serial.begin(9600);
 }
 
 void loop() {
     InitialMsg();
+    readVariables();
     readKeyboard();
+    publishToPLC();
 }
 
+void publishToPLC(){
+  regBank.set(40001, (word) Temperatura);
+  regBank.set(40002, (word) Presion);
+  regBank.set(40003, (word) Peso);
+  regBank.set(40004, (word) 5);
+}
+void initPLC(){
+  //Assign the modbus device ID.  
+  regBank.setId(1);
+  regBank.add(30001);  
+  regBank.add(30002);  
+  regBank.add(40001);  
+  regBank.add(40002);
+  regBank.add(40003);  
+  regBank.add(40004);
+  slave._device = &regBank;  
+  slave.setBaud(&Serial,RS485Baud,RS485Format,RS485TxEnablePin);   
+}
+void readVariables(){
+  //Aqui se va a leer temperatura, presion y peso.
+  //Temperatura 
+  sensorValue = analogRead(analogInTermocupla);
+  Temperatura = sensorValue * 0.055 + 13.75;
+  //Peso
+  balanza.set_scale(630.9); // Establecemos la escala esta es el resultado de la división de la lectura de calibracion entre 771.6179 para mostrar el peso grain
+  balanza.tare(100);
+  Peso = balanza.get_units(5);
+  //Presion
+  //Como el sensor aun no esta envio la temperatura --> Por favor agregar aqui la lectura del sensor de presion PSI
+  Presion = Temperatura;        
+          
+}
 void readKeyboard()
 {
-  char key = keypad.getKey();  
+  key = keypad.getKey();  
   Serial.println(key);
   switch (key){
         case '1':
         while(1){
           limpiarPantalla();
-          sensorValue = analogRead(analogInTermocupla);
-          outputValue = sensorValue * 0.055 + 13.75;
+          outputValue = Temperatura;
           mensajeSalida = String(outputValue)+"'C";
           printMsg("TEMPERATURA",mensajeSalida,5,2);
-        
+
           if(exitBtnPressedOnDelay()){
               break;
           }  
@@ -73,10 +121,8 @@ void readKeyboard()
 
         case '2':
         while(1){
-          balanza.set_scale(630.9); // Establecemos la escala esta es el resultado de la división de la lectura de calibracion entre 771.6179 para mostrar el peso grain
-          balanza.tare(100);
-          peso = balanza.get_units(5);
-          mensajeSalida = String(peso)+" GRAMOS";
+          outputValue = Peso;
+          mensajeSalida = String(outputValue)+" GRAMOS";
           printMsg("NIVEL",mensajeSalida,0,0);
           
           if(exitBtnPressedOnDelay()){
@@ -88,8 +134,7 @@ void readKeyboard()
         case '3':
         while(1){
           limpiarPantalla();
-          sensorValue = analogRead(analogInTermocupla);
-          outputValue = sensorValue * 0.055 + 13.75;
+          outputValue = Presion;
           mensajeSalida = String(outputValue)+"Psi";
           printMsg("Presion",mensajeSalida,5,2);
           
@@ -107,6 +152,7 @@ void readKeyboard()
           break;
         
     }
+  }
 } 
 void InitialMsg()
 {
@@ -144,3 +190,4 @@ boolean exitBtnPressedOnDelay(){
     }
   return returned;              
 }
+
