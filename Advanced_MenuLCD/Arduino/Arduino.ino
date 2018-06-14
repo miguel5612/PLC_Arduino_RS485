@@ -54,20 +54,8 @@ LiquidCrystal_I2C lcd(0x27, 16, 2);
 modbusDevice regBank;
 modbusSlave slave;
 
-void setup() 
-{
-    lcd.begin();
-    initPLC();
-    Serial.begin(9600);
-}
-
-void loop() {
-    InitialMsg();
-    readVariables();
-    readKeyboard();
-    publishToPLC();
-}
-
+//Cambiar de acuerdo a las necesidades.
+//El plc programado es un DVP-14SS2.
 void publishToPLC(){
   regBank.set(40001, (word) Temperatura);
   regBank.set(40002, (word) Presion);
@@ -86,6 +74,21 @@ void initPLC(){
   slave._device = &regBank;  
   slave.setBaud(&Serial,RS485Baud,RS485Format,RS485TxEnablePin);   
 }
+
+void setup() 
+{
+    lcd.begin();
+    initPLC();
+    readVariables();//Es recomendable leerlas para tener valores diferente de 0 en las variables
+    Serial.begin(9600);
+}
+
+void loop() {    
+    readKeyboard();
+    slave.run();  
+}
+
+
 void readVariables(){
   //Aqui se va a leer temperatura, presion y peso.
   //Temperatura 
@@ -143,7 +146,8 @@ void readKeyboard()
           endMillis = millis()+longDelay;
           if(exitBtnPressedOnDelay()){
               break;
-          }  
+          }
+        }  
         
           
         break;
@@ -151,7 +155,6 @@ void readKeyboard()
           InitialMsg();
           break;
         
-    }
   }
 } 
 void InitialMsg()
@@ -181,12 +184,16 @@ boolean exitBtnPressedOnDelay(){
   //un delay sin dejar de leer el teclado
     startMillis = millis();
     endMillis = millis()+longDelay;
+      //Aprovechando el Delay se leen las variables y se publica al plc el estado
+      publishToPLC();
+      readVariables();
     while(millis()<=endMillis){
       key = keypad.getKey();
       if(key == exitKey){
         returned = true;
         break;
       }
+        slave.run();  
     }
   return returned;              
 }
