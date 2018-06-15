@@ -1,16 +1,14 @@
+#include <modbus.h>
+#include <modbusDevice.h>
+#include <modbusRegBank.h>
+#include <modbusSlave.h>
 #include <HX711.h>
 #include <Keyboard.h>
 #include <LiquidCrystal_I2C.h>
 #include <Keypad.h>
 #include <Wire.h>
-#include <modbus.h>
-#include <modbusDevice.h>
-#include <modbusRegBank.h>
-#include <modbusSlave.h>
-
 #define DOUT  A2
 #define CLK  A1
-#define longDelay 1000
 #define exitKey '#'
 
 const int rs = 12, en = 11, d4 = 5, d5 = 4, d6 = 3, d7 = 2;
@@ -57,10 +55,11 @@ modbusSlave slave;
 //Cambiar de acuerdo a las necesidades.
 //El plc programado es un DVP-14SS2.
 void publishToPLC(){
-  regBank.set(40001, (word) Temperatura);
-  regBank.set(40002, (word) Presion);
-  regBank.set(40003, (word) Peso);
+  regBank.set(40001, (word) abs(Temperatura));
+  regBank.set(40002, (word) abs(Presion));
+  regBank.set(40003, (word) abs(Peso));
   regBank.set(40004, (word) 5);
+  slave.run();
 }
 void initPLC(){
   //Assign the modbus device ID.  
@@ -78,17 +77,13 @@ void initPLC(){
 void setup() 
 {
     lcd.begin();
-    initPLC();
     readVariables();//Es recomendable leerlas para tener valores diferente de 0 en las variables
-    Serial.begin(9600);
+    initPLC();
 }
 
 void loop() {    
     readKeyboard();
-    slave.run();  
 }
-
-
 void readVariables(){
   //Aqui se va a leer temperatura, presion y peso.
   //Temperatura 
@@ -100,13 +95,14 @@ void readVariables(){
   Peso = balanza.get_units(5);
   //Presion
   //Como el sensor aun no esta envio la temperatura --> Por favor agregar aqui la lectura del sensor de presion PSI
-  Presion = Temperatura;        
-          
+  Presion = Temperatura;                 
 }
 void readKeyboard()
 {
   key = keypad.getKey();  
-  Serial.println(key);
+  if(!(key == '1' || key == '2' || key == '3')){
+    publishToPLC();
+  }
   switch (key){
         case '1':
         while(1){
@@ -114,8 +110,7 @@ void readKeyboard()
           outputValue = Temperatura;
           mensajeSalida = String(outputValue)+"'C";
           printMsg("TEMPERATURA",mensajeSalida,5,2);
-
-          if(exitBtnPressedOnDelay()){
+          if(exitBtnPressedOnDelay(1000)){
               break;
           }  
         }         
@@ -128,7 +123,7 @@ void readKeyboard()
           mensajeSalida = String(outputValue)+" GRAMOS";
           printMsg("NIVEL",mensajeSalida,0,0);
           
-          if(exitBtnPressedOnDelay()){
+          if(exitBtnPressedOnDelay(1000)){
               break;
           }
           
@@ -142,14 +137,10 @@ void readKeyboard()
           printMsg("Presion",mensajeSalida,5,2);
           
           //un delay sin dejar de leer el teclado
-          startMillis = millis();
-          endMillis = millis()+longDelay;
-          if(exitBtnPressedOnDelay()){
+          if(exitBtnPressedOnDelay(1000)){
               break;
           }
-        }  
-        
-          
+        }           
         break;
         default:
           InitialMsg();
@@ -179,21 +170,20 @@ void printMsg(String mensajeLinea1,String mensajeLinea2,int x1, int x2){
     mensajeAntiguoLinea2 = mensajeLinea2;
   }
 }
-boolean exitBtnPressedOnDelay(){
+boolean exitBtnPressedOnDelay(int timeDelay){
   boolean returned = false;
   //un delay sin dejar de leer el teclado
     startMillis = millis();
-    endMillis = millis()+longDelay;
+    endMillis = millis()+timeDelay;
       //Aprovechando el Delay se leen las variables y se publica al plc el estado
-      publishToPLC();
-      readVariables();
+    readVariables();
     while(millis()<=endMillis){
       key = keypad.getKey();
+      publishToPLC();    
       if(key == exitKey){
         returned = true;
         break;
       }
-        slave.run();  
     }
   return returned;              
 }
