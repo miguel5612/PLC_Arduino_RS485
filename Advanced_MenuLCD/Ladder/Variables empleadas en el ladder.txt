@@ -1,0 +1,19 @@
+M ---> Relevo interno
+T --> Timer
+D --> Palabra, String
+
+M512 --> Este registro es un rele interno y se mantiene en TRUE mientras
+el programa esta corriendo
+T0, T1 --> Timers que accionan la lectura del bus MODBUS.
+T2 --> Timer de precalentamiento (18000 --> 30min)
+T3 --> Timer que vigila el tiempo de apertura maximo de la electrovalvula (3000 - 5min).
+M513 --> Bandera de presion alta (Paro de emergencia)
+D100--> Temperatura
+D101 --> Presion
+D1 --> Peso
+M514 --> Bandera que el peso es mayor o igual a 188
+M515 --> Bandera de la electrovalvula (Se acciona por peso)
+M516 --> Bandera de la electrovalcula (Se acciona por maximo peso alcanzado).
+M517 --> Fallo por falta de material (Timed out).
+M518 --> Registro en caso que la temperatura sea menor que 60 pero no se sabe si es mayor que 40.
+
