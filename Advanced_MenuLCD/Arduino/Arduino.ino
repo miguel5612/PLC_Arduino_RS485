@@ -1,16 +1,27 @@
+// Proceso de dosificacion
+// Fecha de creacion: 24.06.2018
+
+//libreria para controlar las comunicaciones SPi
+#include <Wire.h>
+//Librerias empleadas para modbus
 #include <modbus.h>
 #include <modbusDevice.h>
 #include <modbusRegBank.h>
 #include <modbusSlave.h>
-#include <HX711.h>
-#include <Keyboard.h>
-#include <LiquidCrystal_I2C.h>
+//Libreria empleada para la balanza
+#include "HX711.h"
+//Libreria para controlar el teclado
 #include <Keypad.h>
-#include <Wire.h>
+//Libreria para controlar la pantalla
+#include <LiquidCrystal_I2C.h>
+
+
+//Pines de la balanza
 #define DOUT  A2
 #define CLK  A1
 #define exitKey '#'
 
+//Configuracion de la pantalla, termocupla y teclado
 const int rs = 12, en = 11, d4 = 5, d5 = 4, d6 = 3, d7 = 2;
 const byte rowsCount = 4;
 const byte columsCount = 4;
@@ -37,6 +48,8 @@ String mensajeAntiguoLinea1 = "";
 String mensajeAntiguoLinea2 = "";
 String mensajeSalida = "";
 char key;
+char tempKey ;
+bool bandera = true;
 
 // definen los símbolos en los botones de los teclados 
 char keys[rowsCount][columsCount] = {
@@ -51,6 +64,17 @@ HX711 balanza(DOUT, CLK);
 LiquidCrystal_I2C lcd(0x27, 16, 2);
 modbusDevice regBank;
 modbusSlave slave;
+
+
+
+//Codigo de inicializacion de la balanza
+void initBalanza()
+{
+  balanza.set_scale(-982.4089947); // Establecemos la escala
+  balanza.tare(20);  //El peso actual es considerado Tara.
+  
+}
+
 
 //Cambiar de acuerdo a las necesidades.
 //El plc programado es un DVP-14SS2.
@@ -76,81 +100,65 @@ void initPLC(){
 
 void setup() 
 {
+    initBalanza();
     lcd.begin();
     readVariables();//Es recomendable leerlas para tener valores diferente de 0 en las variables
     initPLC();
 }
 
 void loop() {    
-    readKeyboard();
-}
+     readKeyboard(); //Lee el teclado, sino se comunica con el PLC, sino publica el mensaje en la pantalla.
+    if(!validateKey(key)){
+      InitialMsg();
+    }
+    readVariables();
+    publishToPLC();
+ }
 void readVariables(){
   //Aqui se va a leer temperatura, presion y peso.
   //Temperatura 
   sensorValue = analogRead(analogInTermocupla);
   Temperatura = sensorValue * 0.055 + 13.75;
   //Peso
-  balanza.set_scale(630.9); // Establecemos la escala esta es el resultado de la división de la lectura de calibracion entre 771.6179 para mostrar el peso grain
-  balanza.tare(100);
-  Peso = balanza.get_units(5);
+  //Peso = balanza.get_units(20);
   //Presion
   //Como el sensor aun no esta envio la temperatura --> Por favor agregar aqui la lectura del sensor de presion PSI
   Presion = Temperatura;                 
 }
 void readKeyboard()
 {
-  key = keypad.getKey();  
-  if(!(key == '1' || key == '2' || key == '3')){
-    publishToPLC();
-  }
+  tempKey = keypad.getKey();
+  if(validateKey(tempKey) == 1){
+    key = tempKey;
+  }else if(validateExitKey(tempKey) == 1){
+    key = ' '; //Tecla que no hace ninguna accion en el programa
+  }else 
+  {
   switch (key){
+  
         case '1':
-        while(1){
-          limpiarPantalla();
           outputValue = Temperatura;
           mensajeSalida = String(outputValue)+"'C";
-          printMsg("TEMPERATURA",mensajeSalida,5,2);
-          if(exitBtnPressedOnDelay(1000)){
-              break;
-          }  
-        }         
-          
+          printMsg("TEMPERATURA",mensajeSalida,5,2);  
         break;
 
         case '2':
-        while(1){
           outputValue = Peso;
           mensajeSalida = String(outputValue)+" GRAMOS";
           printMsg("NIVEL",mensajeSalida,0,0);
-          
-          if(exitBtnPressedOnDelay(1000)){
-              break;
-          }
-          
-        }
         break;
+        
         case '3':
-        while(1){
-          limpiarPantalla();
           outputValue = Presion;
           mensajeSalida = String(outputValue)+"Psi";
           printMsg("Presion",mensajeSalida,5,2);
-          
-          //un delay sin dejar de leer el teclado
-          if(exitBtnPressedOnDelay(1000)){
-              break;
-          }
-        }           
-        break;
-        default:
-          InitialMsg();
-          break;
-        
+        break;        
+    }
   }
 } 
 void InitialMsg()
 {
-    printMsg("VARIABLE","1Temp 2Nvl 3Tiem",4,0);
+    printMsg("VARIABLE","1Temp 2Nvl 3Pres",4,0);
 }
 
 void limpiarPantalla(){
@@ -170,21 +178,20 @@ void printMsg(String mensajeLinea1,String mensajeLinea2,int x1, int x2){
     mensajeAntiguoLinea2 = mensajeLinea2;
   }
 }
-boolean exitBtnPressedOnDelay(int timeDelay){
-  boolean returned = false;
-  //un delay sin dejar de leer el teclado
-    startMillis = millis();
-    endMillis = millis()+timeDelay;
-      //Aprovechando el Delay se leen las variables y se publica al plc el estado
-    readVariables();
-    while(millis()<=endMillis){
-      key = keypad.getKey();
-      publishToPLC();    
-      if(key == exitKey){
-        returned = true;
-        break;
-      }
-    }
-  return returned;              
+bool validateKey(char keyPressed)
+{
+  if(keyPressed=='1' || keyPressed == '2' || keyPressed == '3')
+  {
+    return true; //Valid key
+  }
+  return false;
+}
+bool validateExitKey(char keyPressed)
+{
+  if(keyPressed == exitKey)
+  {
+    return true; //Valid key
+  }
+  return false;
 }
 
