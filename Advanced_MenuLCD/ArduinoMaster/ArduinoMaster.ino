@@ -20,6 +20,8 @@
 #define DOUT  A2
 #define CLK  A1
 #define exitKey '#'
+#define longBytesReceive 10
+#define minMilistoPrintLCD 200
 
 //Configuracion de la pantalla, termocupla y teclado
 const int rs = 12, en = 11, d4 = 5, d5 = 4, d6 = 3, d7 = 2;
@@ -50,6 +52,10 @@ String mensajeSalida = "";
 char key;
 char tempKey ;
 bool bandera = true;
+char inChar;
+char inData[longBytesReceive];
+int index;
+long oldMilis;
 
 // definen los símbolos en los botones de los teclados 
 char keys[rowsCount][columsCount] = {
@@ -102,12 +108,13 @@ void setup()
 {
     initBalanza();
     lcd.begin();
+    Serial2.begin(9600);
     readVariables();//Es recomendable leerlas para tener valores diferente de 0 en las variables
     initPLC();
 }
 
 void loop() {    
-     readKeyboard(); //Lee el teclado, sino se comunica con el PLC, sino publica el mensaje en la pantalla.
+    readKeyboard(); //Lee el teclado, sino se comunica con el PLC, sino publica el mensaje en la pantalla.
     if(!validateKey(key)){
       InitialMsg();
     }
@@ -120,6 +127,11 @@ void readVariables(){
   sensorValue = analogRead(analogInTermocupla);
   Temperatura = sensorValue * 0.055 + 13.75;
   //Peso
+  index = 0;
+  if(Serial2.available()){
+    Serial2.readBytes(inData,longBytesReceive);   
+  }
+  Peso = String(inData).toInt();
   //Peso = balanza.get_units(20);
   //Presion
   //Como el sensor aun no esta envio la temperatura --> Por favor agregar aqui la lectura del sensor de presion PSI
@@ -167,8 +179,9 @@ void limpiarPantalla(){
   mensajeAntiguoLinea2 = "";
 }
 void printMsg(String mensajeLinea1,String mensajeLinea2,int x1, int x2){
-  if(!(mensajeLinea1==mensajeAntiguoLinea1)||!(mensajeLinea2==mensajeAntiguoLinea2))
+  if(!(mensajeLinea1==mensajeAntiguoLinea1)||!(mensajeLinea2==mensajeAntiguoLinea2) && millis()>oldMilis+minMilistoPrintLCD)
   {
+    oldMilis = millis();
     lcd.clear();
     lcd.setCursor(x1,0);
     lcd.print(mensajeLinea1);
