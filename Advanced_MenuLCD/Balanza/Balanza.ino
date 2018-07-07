@@ -25,8 +25,7 @@ void setup() {
 }
 
 void loop() {
-  //peso = balanza.get_units(20);
-  peso = random(0,3000);
+  peso = balanza.get_units(20);
   strPeso = String(peso);
   strPeso.toCharArray(charPeso,longBytesReceive);
   ArduinoMega.write(charPeso,longBytesReceive);
