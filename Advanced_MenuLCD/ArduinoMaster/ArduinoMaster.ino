@@ -29,7 +29,7 @@ const byte rowsCount = 4;
 const byte columsCount = 4;
 const byte rowPins[rowsCount] = {A15, A14, A13, A12}; //connect to the row pinouts of the keypad
 const byte columnPins[columsCount]= {A11, A10, A9, A8};
-const int analogInTermocupla = 0;  // Analog input pin that the potentiometer is attached to
+const int analogInTermocupla = A0;  // Analog input pin that the potentiometer is attached to
 const int analogInCelda = 2;//Entrada de la celda de carga 
 
 //PLC Settings
@@ -42,6 +42,7 @@ const int analogInCelda = 2;//Entrada de la celda de carga
 
 
 int sensorValue = 0;        // value read from the pot
+int sensorValue2 = 0;
 int outputValue = 0;        // value output to the PWM (analog out)
 int Peso,Temperatura,Presion;
 long startMillis = 0;
@@ -80,7 +81,6 @@ void initBalanza()
   balanza.tare(20);  //El peso actual es considerado Tara.
   
 }
-
 
 //Cambiar de acuerdo a las necesidades.
 //El plc programado es un DVP-14SS2.
@@ -135,7 +135,7 @@ void readVariables(){
   //Peso = balanza.get_units(20);
   //Presion
   //Como el sensor aun no esta envio la temperatura --> Por favor agregar aqui la lectura del sensor de presion PSI
-  Presion = Temperatura;                 
+  Presion = 437 * sensorValue2 - 1.75 ;                 
 }
 void readKeyboard()
 {
