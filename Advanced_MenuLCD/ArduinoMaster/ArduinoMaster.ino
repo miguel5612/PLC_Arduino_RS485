@@ -31,7 +31,7 @@ const byte rowPins[rowsCount] = {A15, A14, A13, A12}; //connect to the row pinou
 const byte columnPins[columsCount]= {A11, A10, A9, A8};
 const int analogInTermocupla = A0;  // Analog input pin that the potentiometer is attached to
 const int analogInCelda = 2;//Entrada de la celda de carga 
-
+const int sensorPresion = A3;
 //PLC Settings
 
 #define RS485TxEnablePin 2
@@ -107,6 +107,7 @@ void initPLC(){
 void setup() 
 {
     initBalanza();
+    pinMode(A3,INPUT); //Entrada del sensor de presion
     lcd.begin();
     Serial2.begin(9600);
     readVariables();//Es recomendable leerlas para tener valores diferente de 0 en las variables
@@ -134,7 +135,8 @@ void readVariables(){
   Peso = String(inData).toInt();
   //Peso = balanza.get_units(20);
   //Presion
-  //Como el sensor aun no esta envio la temperatura --> Por favor agregar aqui la lectura del sensor de presion PSI
+  // 07.07.18 Se agrega la ecuacion que calcula la presion apartir de la lectura analogica.
+  sensorValue2 = analogRead(sensorPresion);
   Presion = 437 * sensorValue2 - 1.75 ;                 
 }
 void readKeyboard()
